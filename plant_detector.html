@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Ensures proper rendering and touch zooming on mobile devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlantGuard - Disease Detection</title>
+    
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load Lucide icons for a cleaner UI -->
+    <script src="https://unpkg.com/lucide-dev@latest"></script>
+    
+    <!-- Added Poppins font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Custom styles */
+        body {
+            /* Added Poppins font */
+            font-family: 'Poppins', sans-serif;
+            /* Added gradient background */
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        /* Hide the default file input */
+        #upload-input {
+            display: none;
+        }
+
+        /* Simple loading spinner */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #16a34a; /* Green */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Ensure video feed is responsive */
+        #camera-feed {
+            width: 100%;
+            height: auto;
+            border-radius: 0.5rem; /* rounded-lg */
+            border: 1px solid #e5e7eb; /* border-gray-200 */
+        }
+        
+        /* Added flip-card CSS from uploaded file */
+        .disease-card {
+            perspective: 1000px;
+        }
+        .disease-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .disease-card:hover .disease-inner {
+            transform: rotateY(180deg);
+        }
+        .disease-front, .disease-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden; /* Safari */
+            backface-visibility: hidden;
+            border-radius: 1rem; /* rounded-xl */
+        }
+        .disease-back {
+            transform: rotateY(180deg);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+
+    <!-- 
+      Page 1: Login Page
+      Initially visible by default, will be hidden by JS if logged in.
+    -->
+    <div id="login-page" class="flex items-center justify-center min-h-screen">
+        <div class="bg-white p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-md border border-gray-200">
+            <div class="text-center mb-8">
+                <i data-lucide="leaf" class="w-16 h-16 text-green-600 mx-auto"></i>
+                <h1 class="text-3xl font-bold text-gray-800 mt-4">Welcome to PlantDoc</h1>
+                <p class="text-gray-600 mt-2">Sign in to protect your plants.</p>
+            </div>
+            
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="login-email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input type="email" id="login-email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="you@example.com">
+                </div>
+                
+                <div class="mb-6">
+                    <label for="login-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="login-password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="••••••••">
+                </div>
+                
+                <!-- Error Message -->
+                <div id="login-error" class="hidden text-red-600 text-sm text-center mb-4 p-3 bg-red-50 rounded-lg"></div>
+
+                <button id="login-button" type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition duration-300 shadow-md">
+                    Sign In
+                </button>
+            </form>
+            
+            <p class="text-center text-gray-600 text-sm mt-6">
+                Don't have an account? 
+                <a href="#" id="to-register-link" class="font-medium text-green-600 hover:text-green-700 hover:underline">
+                    Register here
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <!-- 
+      Page 2: Register Page
+      Initially hidden.
+    -->
+    <div id="register-page" class="hidden flex items-center justify-center min-h-screen">
+        <div class="bg-white p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-md border border-gray-200">
+            <div class="text-center mb-8">
+                <i data-lucide="user-plus" class="w-16 h-16 text-green-600 mx-auto"></i>
+                <h1 class="text-3xl font-bold text-gray-800 mt-4">Create Your Account</h1>
+                <p class="text-gray-600 mt-2">Get started with PlantDoc.</p>
+            </div>
+            
+            <form id="register-form">
+                <div class="mb-4">
+                    <label for="register-name" class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <input type="text" id="register-name" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="John Doe">
+                </div>
+
+                <div class="mb-4">
+                    <label for="register-email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input type="email" id="register-email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="you@example.com">
+                </div>
+                
+                <div class="mb-6">
+                    <label for="register-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="register-password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Must be at least 6 characters">
+                </div>
+
+                <!-- Error Message -->
+                <div id="register-error" class="hidden text-red-600 text-sm text-center mb-4 p-3 bg-red-50 rounded-lg"></div>
+                
+                <button id="register-button" type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition duration-300 shadow-md">
+                    Create Account
+                </button>
+            </form>
+            
+            <p class="text-center text-gray-600 text-sm mt-6">
+                Already have an account? 
+                <a href="#" id="to-login-link" class="font-medium text-green-600 hover:text-green-700 hover:underline">
+                    Sign in
+                </a>
+            </p>
+        </div>
+    </div>
+
+
+    <!-- 
+      Page 3: Main Application Page
+      Initially hidden. Shown after successful login/register.
+    -->
+    <!-- Removed bg-white to allow body gradient to show -->
+    <div id="app-page" class="hidden min-h-screen">
+        <!-- Header: Added transparency and blur -->
+        <header class="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 sticky top-0 z-10">
+            <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <!-- Logo/Title -->
+                    <div class="flex-shrink-0 flex items-center">
+                        <i data-lucide="leaf" class="w-8 h-8 text-green-600"></i>
+                        <span class="text-2xl font-bold text-gray-800 ml-2">PlantDoc</span>
+                    </div>
+                    
+                    <!-- Logout Button -->
+                    <button id="logout-button" class="flex items-center text-sm text-gray-600 hover:text-red-600 transition duration-150">
+                        <i data-lucide="log-out" class="w-4 h-4 mr-1.5"></i>
+                        Logout
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            
+            <!-- Hero/Info Section - REPLACED with new hero section -->
+            <section id="hero" class="bg-gradient-to-r from-green-700 via-green-600 to-emerald-500 text-white py-12 md:py-20 rounded-xl shadow-2xl mb-10 overflow-hidden">
+                <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+                    <!-- Left: Text Content -->
+                    <div>
+                        <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 leading-tight">
+                            Identify Plant Diseases Instantly
+                        </h1>
+                        <p class="text-lg md:text-xl mb-8 opacity-90 max-w-lg">
+                            Upload a photo or use your camera to detect plant leaf diseases in real-time with AI-powered accuracy and get instant care tips.
+                        </p>
+                        <div class="flex flex-wrap gap-4">
+                            <!-- Updated to use Lucide icons -->
+                            <a href="#detection-tool" class="flex items-center bg-white text-green-700 px-6 py-3 rounded-full font-semibold shadow-md hover:bg-green-100 transition-all">
+                                <i data-lucide="camera" class="w-5 h-5 mr-2"></i>
+                                Start Detection
+                            </a>
+                            <a href="#how-it-works" class="flex items-center border-2 border-white text-white px-6 py-3 rounded-full font-semibold hover:bg-white hover:text-green-700 transition-all">
+                                <i data-lucide="info" class="w-5 h-5 mr-2"></i>
+                                Learn More
+                            </a>
+                        </div>
+                    </div>
+                    <!-- Right: Image -->
+                    <div class="hidden md:flex justify-center md:justify-end">
+                        <img 
+                            src="./1.jpg" 
+                            alt="Plant Leaf" 
+                            class="rounded-2xl shadow-2xl w-80 md:w-[420px] hover:scale-105 transition duration-500"
+                        />
+                    </div>
+                </div>
+            </section>
+
+            <!-- How it works - REPLACED with flip-card design -->
+            <section id="how-it-works" class="mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 text-center mb-8">How It Works</h2>
+                <div class="max-w-7xl mx-auto px-4">
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        
+                        <!-- Card 1: Capture -->
+                        <div class="disease-card h-80">
+                            <div class="disease-inner h-full">
+                                <div class="disease-front bg-white shadow-lg p-6 flex flex-col items-center text-center">
+                                    <!-- Fixed image path and removed duplicate icon -->
+                                    <img src="./2.jpg" alt="Capture or Upload" class="w-20 h-20 mx-auto mb-4 rounded-full">
+                                    <h3 class="text-2xl font-semibold text-gray-800 mb-2">1. Capture or Upload</h3>
+                                    <p class="text-gray-600">Use your camera to snap a photo or upload one from your device.</p>
+                                    <span class="text-sm text-blue-600 font-medium mt-auto">Hover to learn more</span>
+                                </div>
+                                <div class="disease-back bg-green-600 text-white p-6">
+                                    <h3 class="text-2xl font-semibold mb-4">Capture Details</h3>
+                                    <ul class="list-disc list-inside space-y-2 text-sm">
+                                        <li>Click 'Open Camera' for a live feed.</li>
+                                        <li>We support JPG, PNG, and WEBP formats.</li>
+                                        <li>For best results, use a clear image with good lighting.</li>
+                                        <li>Focus on a single leaf if possible.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Analyze -->
+                        <div class="disease-card h-80">
+                            <div class="disease-inner h-full">
+                                <div class="disease-front bg-white shadow-lg p-6 flex flex-col items-center text-center">
+                                    <!-- Fixed image path and removed duplicate icon -->
+                                    <img src="./3.jpg" alt="AI Analysis" class="w-20 h-20 mx-auto mb-4 rounded-full">
+                                    <h3 class="text-2xl font-semibold text-gray-800 mb-2">2. AI Analysis</h3>
+                                    <p class="text-gray-600">Our model analyzes the image against thousands of data points.</p>
+                                    <span class="text-sm text-blue-600 font-medium mt-auto">Hover to learn more</span>
+                                </div>
+                                <div class="disease-back bg-blue-600 text-white p-6">
+                                    <h3 class="text-2xl font-semibold mb-4">Analysis Details</h3>
+                                    <ul class="list-disc list-inside space-y-2 text-sm">
+                                        <li>This is a *simulated* analysis for demo purposes.</li>
+                                        <li>A real model would detect patterns, colors, and textures.</li>
+                                        <li>We check for common issues like mildew, blight, and spots.</li>
+                                        <li>The process is fast, usually taking just a few seconds.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Results -->
+                        <div class="disease-card h-80">
+                            <div class="disease-inner h-full">
+                                <div class="disease-front bg-white shadow-lg p-6 flex flex-col items-center text-center">
+                                    <!-- Fixed image path and removed duplicate icon -->
+                                    <img src="./4.png" alt="Get Results" class="w-20 h-20 mx-auto mb-4 rounded-full">
+                                    <h3 class="text-2xl font-semibold text-gray-800 mb-2">3. Get Results</h3>
+                                    <p class="text-gray-600">Receive a diagnosis and actionable care suggestions.</p>
+                                    <span class="text-sm text-blue-600 font-medium mt-auto">Hover to learn more</span>
+                                </div>
+                                <div class="disease-back bg-gray-700 text-white p-6">
+                                    <h3 class="text-2xl font-semibold mb-4">Results Details</h3>
+                                    <ul class="list-disc list-inside space-y-2 text-sm">
+                                        <li>We provide a disease name and severity.</li>
+                                        <li>Get a confidence score for our diagnosis.</li>
+                                        <li>Follow the simple "Recommended Action" steps.</li>
+                                        <li>Our goal is to help you act fast to save your plant.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detection Tool: Added transparency and blur -->
+            <section id="detection-tool" class="bg-white/80 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200/50">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <!-- Column 1: Input (Camera/Upload) -->
+                    <div class="flex flex-col space-y-4">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Start Your Diagnosis</h2>
+                        
+                        <!-- Camera Feed (hidden initially) -->
+                        <video id="camera-feed" class="hidden" autoplay playsinline></video>
+                        
+                        <!-- Image Preview -->
+                        <div id="image-preview-container" class="hidden w-full p-4 border-2 border-dashed border-gray-300 rounded-lg">
+                            <img id="image-preview" src="#" alt="Image Preview" class="w-full h-auto rounded-lg">
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button id="start-camera-button" class="flex-1 flex items-center justify-center px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition duration-300 shadow-lg">
+                                <i data-lucide="video" class="w-5 h-5 mr-2"></i>
+                                Open Camera
+                            </button>
+                            <!-- This button is shown when camera is active -->
+                            <button id="capture-button" class="hidden flex-1 flex items-center justify-center px-5 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition duration-300 shadow-lg">
+                                <i data-lucide="camera" class="w-5 h-5 mr-2"></i>
+                                Take Photo
+                            </button>
+                            
+                            <label for="upload-input" class="flex-1 flex items-center justify-center px-5 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition duration-300 cursor-pointer shadow-lg">
+                                <i data-lucide="upload" class="w-5 h-5 mr-2"></i>
+                                Upload Image
+                            </label>
+                            <input type="file" id="upload-input" accept="image/*">
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Results -->
+                    <div class="flex flex-col">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Analysis Results</h2>
+                        
+                        <div id="results-container" class="flex-1 flex items-center justify-center bg-gray-50/70 border-2 border-dashed border-gray-300 rounded-lg p-8">
+                            <!-- Loading Spinner -->
+                            <div id="loading-spinner" class="hidden loader"></div>
+                            
+                            <!-- Placeholder Text -->
+                            <div id="results-placeholder" class="text-center text-gray-500">
+                                <i data-lucide="bar-chart-3" class="w-12 h-12 mx-auto mb-4"></i>
+                                <p>Your analysis will appear here.</p>
+                            </div>
+
+                            <!-- Dynamic Results -->
+                            <div id="results-box" class="hidden w-full">
+                                <!-- Content will be injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer: Added transparency and blur -->
+        <footer class="text-center p-8 mt-12 border-t border-gray-200/50 bg-white/50 backdrop-blur-md">
+            <p class="text-gray-600 text-sm">&copy; 2025 PlantDoc. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- 
+      JavaScript for all functionality
+    -->
+    <script type="module">
+        // --- DOM Element Selection ---
+        const loginPage = document.getElementById('login-page');
+        const registerPage = document.getElementById('register-page');
+        const appPage = document.getElementById('app-page');
+        
+        // Auth Forms
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const loginEmail = document.getElementById('login-email');
+        const loginPassword = document.getElementById('login-password');
+        const registerName = document.getElementById('register-name');
+        const registerEmail = document.getElementById('register-email');
+        const registerPassword = document.getElementById('register-password');
+        
+        // Error Messages
+        const loginError = document.getElementById('login-error');
+        const registerError = document.getElementById('register-error');
+
+        // Navigation
+        const toRegisterLink = document.getElementById('to-register-link');
+        const toLoginLink = document.getElementById('to-login-link');
+        const logoutButton = document.getElementById('logout-button');
+        
+        // App Functionality
+        const startCameraButton = document.getElementById('start-camera-button');
+        const cameraFeed = document.getElementById('camera-feed');
+        const captureButton = document.getElementById('capture-button');
+        const uploadInput = document.getElementById('upload-input');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        
+        // Results
+        const resultsContainer = document.getElementById('results-container');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const resultsPlaceholder = document.getElementById('results-placeholder');
+        const resultsBox = document.getElementById('results-box');
+
+        // --- State ---
+        let cameraStream = null; // To store the active camera stream
+        const usersDB = 'plantGuardUsers'; // Key for localStorage
+
+        // --- Helper Functions ---
+
+        /**
+         * Shows a specific page and hides all others
+         * @param {string} pageId - The ID of the page to show ('login-page', 'register-page', 'app-page')
+         */
+        function showPage(pageId) {
+            loginPage.classList.add('hidden');
+            registerPage.classList.add('hidden');
+            appPage.classList.add('hidden');
+            
+            document.getElementById(pageId).classList.remove('hidden');
+
+            // Render icons *after* showing the page
+            // This check ensures lucide is loaded before trying to use it
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        /**
+         * Displays an error message
+         * @param {HTMLElement} errorElement - The error div
+         * @param {string} message - The message to display
+         */
+        function showError(errorElement, message) {
+            errorElement.textContent = message;
+            errorElement.classList.remove('hidden');
+        }
+
+        /**
+         * Hides an error message
+         * @param {HTMLElement} errorElement - The error div
+         */
+        function hideError(errorElement) {
+            errorElement.textContent = '';
+            errorElement.classList.add('hidden');
+        }
+
+        /**
+         * Gets the list of users from localStorage
+         * @returns {Array} - Array of user objects
+         */
+        function getUsers() {
+            return JSON.parse(localStorage.getItem(usersDB)) || [];
+        }
+
+        /**
+         * Saves the list of users to localStorage
+         * @param {Array} users - Array of user objects
+         */
+        function saveUsers(users) {
+            localStorage.setItem(usersDB, JSON.stringify(users));
+        }
+        
+        /**
+         * Logs the user in by setting a session item
+         */
+        function loginUser() {
+            // sessionStorage clears when the browser tab is closed
+            sessionStorage.setItem('plantGuardSession', 'true');
+            showPage('app-page');
+            resetAppUI(); // Reset app UI to default state
+        }
+
+        /**
+         * Stops the camera stream if it's running
+         */
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+                cameraFeed.classList.add('hidden');
+                captureButton.classList.add('hidden');
+                startCameraButton.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Resets the app UI to its initial state
+         */
+        function resetAppUI() {
+            stopCamera();
+            imagePreviewContainer.classList.add('hidden');
+            imagePreview.src = '#';
+            resultsPlaceholder.classList.remove('hidden');
+            resultsBox.classList.add('hidden');
+            resultsBox.innerHTML = '';
+            loadingSpinner.classList.add('hidden');
+        }
+
+        // --- Authentication Logic ---
+
+        // Check session on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('plantGuardSession') === 'true') {
+                showPage('app-page');
+            } else {
+                showPage('login-page');
+            }
+            // Render icons - MOVED to showPage() to avoid race condition
+            // lucide.createIcons();
+        });
+
+        // Navigate to Register page
+        toRegisterLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            hideError(loginError);
+            showPage('register-page');
+        });
+
+        // Navigate to Login page
+        toLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            hideError(registerError);
+            showPage('login-page');
+        });
+
+        // Handle Registration
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            hideError(registerError);
+            
+            const name = registerName.value;
+            const email = registerEmail.value;
+            const password = registerPassword.value;
+
+            if (password.length < 6) {
+                showError(registerError, 'Password must be at least 6 characters.');
+                return;
+            }
+
+            const users = getUsers();
+            const existingUser = users.find(user => user.email === email);
+
+            if (existingUser) {
+                showError(registerError, 'An account with this email already exists.');
+            } else {
+                users.push({ name, email, password }); // In a real app, hash the password
+                saveUsers(users);
+                loginUser(); // Log in immediately after registering
+            }
+        });
+
+        // Handle Login
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            hideError(loginError);
+
+            const email = loginEmail.value;
+            const password = loginPassword.value;
+
+            const users = getUsers();
+            const user = users.find(user => user.email === email);
+
+            if (user && user.password === password) { // In a real app, compare hashed passwords
+                loginUser();
+            } else {
+                showError(loginError, 'Invalid email or password.');
+            }
+        });
+
+        // Handle Logout
+        logoutButton.addEventListener('click', () => {
+            sessionStorage.removeItem('plantGuardSession');
+            stopCamera(); // Ensure camera is off on logout
+            showPage('login-page');
+            // Clear form fields
+            loginForm.reset();
+            registerForm.reset();
+        });
+
+        // --- App Functionality Logic ---
+
+        // Start Camera
+        startCameraButton.addEventListener('click', async () => {
+            stopCamera(); // Stop any previous stream
+            imagePreviewContainer.classList.add('hidden'); // Hide image preview
+            
+            try {
+                // Request video stream
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } // Prefer back camera
+                });
+                
+                // Attach stream to video element
+                cameraFeed.srcObject = cameraStream;
+                cameraFeed.classList.remove('hidden');
+                
+                // Update button visibility
+                startCameraButton.classList.add('hidden');
+                captureButton.classList.remove('hidden');
+
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                // Fallback to any camera if environment fails
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    cameraFeed.srcObject = cameraStream;
+                    cameraFeed.classList.remove('hidden');
+                    startCameraButton.classList.add('hidden');
+                    captureButton.classList.remove('hidden');
+                } catch (err2) {
+                    console.error('Error accessing any camera:', err2);
+                    // Show error in results box
+                    resultsPlaceholder.classList.add('hidden');
+                    resultsBox.innerHTML = `<p class="text-red-600">Could not access camera. Please check permissions.</p>`;
+                    resultsBox.classList.remove('hidden');
+                }
+            }
+        });
+
+        // Capture Photo
+        captureButton.addEventListener('click', () => {
+            if (!cameraStream) return;
+
+            // Create a canvas to draw the video frame
+            const canvas = document.createElement('canvas');
+            canvas.width = cameraFeed.videoWidth;
+            canvas.height = cameraFeed.videoHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+            
+            // Get image data URL
+            const imageDataUrl = canvas.toDataURL('image/png');
+            imagePreview.src = imageDataUrl;
+            imagePreviewContainer.classList.remove('hidden');
+            
+            // Stop the camera and reset buttons
+            stopCamera();
+            
+            // Run analysis
+            runAnalysis(imageDataUrl);
+        });
+
+        // Handle Image Upload
+        uploadInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Stop camera if it's running
+            stopCamera();
+
+            // Use FileReader to display preview
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                imagePreview.src = event.target.result;
+                imagePreviewContainer.classList.remove('hidden');
+                
+                // Run analysis
+                runAnalysis(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        /**
+         * Simulates an AI analysis
+         * @param {string} imageDataUrl - The base64 image data
+         */
+        function runAnalysis(imageDataUrl) {
+            // Show loading spinner
+            resultsPlaceholder.classList.add('hidden');
+            resultsBox.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
+
+            // Simulate API call delay
+            setTimeout(() => {
+                loadingSpinner.classList.add('hidden');
+                
+                // --- THIS IS SIMULATED DATA ---
+                // In a real app, you'd send imageDataUrl to your backend model
+                const diseases = [
+                    { name: 'Powdery Mildew', severity: 'High', class: 'border-red-500', bg: 'bg-red-50' },
+                    { name: 'Leaf Spot (Septoria)', severity: 'Medium', class: 'border-yellow-500', bg: 'bg-yellow-50' },
+                    { name: 'Healthy', severity: 'None', class: 'border-green-500', bg: 'bg-green-50' },
+                    { name: 'Tomato Blight (Late)', severity: 'Critical', class: 'border-red-700', bg: 'bg-red-100' },
+                ];
+                const randomResult = diseases[Math.floor(Math.random() * diseases.length)];
+                const confidence = (Math.random() * (99 - 85) + 85).toFixed(2);
+                // --- END SIMULATED DATA ---
+
+                let resultHtml = `
+                    <div class="w-full text-left p-4 rounded-lg border-2 ${randomResult.class} ${randomResult.bg}">
+                        <h3 class="text-2xl font-bold text-gray-900">${randomResult.name}</h3>
+                        <p class="text-lg font-medium ${randomResult.name === 'Healthy' ? 'text-green-700' : 'text-red-700'}">
+                            Severity: ${randomResult.severity}
+                        </p>
+                        <p class="text-md text-gray-700 mt-2"><strong>Confidence:</strong> ${confidence}%</p>
+                        
+                        ${randomResult.name !== 'Healthy' ? `
+                        <div class="mt-4 pt-4 border-t border-gray-300">
+                            <h4 class="font-semibold text-gray-800">Recommended Action:</h4>
+                            <ul class="list-disc list-inside text-gray-600 mt-2 text-sm">
+                                <li>Remove and destroy affected leaves.</li>
+                                <li>Apply a fungicide approved for ${randomResult.name}.</li>
+                                <li>Improve air circulation around the plant.</li>
+                                <li>Water at the base, avoid wetting foliage.</li>
+                            </ul>
+                        </div>
+                        ` : `
+                        <div class="mt-4 pt-4 border-t border-green-300">
+                            <h4 class="font-semibold text-green-800">Looking Good!</h4>
+                            <p class="text-green-700 mt-2 text-sm">Your plant appears healthy. Continue with good care practices.</p>
+                        </div>
+                        `}
+                    </div>
+                `;
+                
+                resultsBox.innerHTML = resultHtml;
+                resultsBox.classList.remove('hidden');
+                
+            }, 2000); // 2-second delay
+        }
+
+    </script>
+</body>
+</html>
